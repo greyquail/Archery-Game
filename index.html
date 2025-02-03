@@ -3,8 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Origami Archery Game</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Archery Shooting Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(to bottom, #a8e6cf, #dcedc1); position: relative; }
+        canvas { background-color: white; border: 3px solid black; }
+        #gameOverScreen { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.8); color: white; padding: 20px; border-radius: 10px; text-align: center; }
+        #restartButton { margin-top: 10px; padding: 10px; background: #ff8b94; color: white; border: none; cursor: pointer; }
+    </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
@@ -13,7 +19,98 @@
         <p id="finalScore"></p>
         <button id="restartButton">Restart</button>
     </div>
-    <script src="script.js"></script>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 800;
+        canvas.height = 400;
+
+        let score = 0;
+        let gameOver = false;
+        let speed = 2;
+        const archer = { x: 50, y: canvas.height - 80, width: 40, height: 60 };
+        const arrows = [];
+        const arrowSpeed = 5;
+        const targets = [];
+
+        function spawnTarget() {
+            const x = Math.random() * (canvas.width - 40);
+            targets.push({ x, y: 0, width: 40, height: 40, speed });
+        }
+
+        setInterval(spawnTarget, 1000);
+
+        document.addEventListener("keydown", (event) => {
+            if (event.code === "ArrowLeft" && archer.x > 10) archer.x -= 20;
+            else if (event.code === "ArrowRight" && archer.x < canvas.width - archer.width - 10) archer.x += 20;
+            else if (event.code === "Space") arrows.push({ x: archer.x + 15, y: archer.y, width: 5, height: 15 });
+        });
+
+        function update() {
+            if (gameOver) return;
+
+            arrows.forEach((arrow, aIndex) => {
+                arrow.y -= arrowSpeed;
+                targets.forEach((target, tIndex) => {
+                    if (
+                        arrow.y <= target.y + target.height &&
+                        arrow.x >= target.x &&
+                        arrow.x <= target.x + target.width
+                    ) {
+                        score += 10;
+                        targets.splice(tIndex, 1);
+                        arrows.splice(aIndex, 1);
+                    }
+                });
+            });
+
+            targets.forEach((target, index) => {
+                target.y += target.speed;
+                if (target.y > canvas.height) {
+                    gameOver = true;
+                    document.getElementById("gameOverScreen").style.display = "block";
+                    document.getElementById("finalScore").textContent = `Your Score: ${score}`;
+                }
+            });
+
+            if (score % 50 === 0 && score > 0) speed += 0.2;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "brown";
+            ctx.fillRect(archer.x, archer.y, archer.width, archer.height);
+            arrows.forEach(arrow => {
+                ctx.fillStyle = "black";
+                ctx.fillRect(arrow.x, arrow.y, arrow.width, arrow.height);
+            });
+            ctx.fillStyle = "red";
+            targets.forEach(target => {
+                ctx.fillRect(target.x, target.y, target.width, target.height);
+            });
+            ctx.fillStyle = "black";
+            ctx.font = "20px Arial";
+            ctx.fillText(`Score: ${score}`, 10, 30);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (!gameOver) requestAnimationFrame(gameLoop);
+        }
+        
+        document.getElementById("restartButton").addEventListener("click", () => {
+            document.getElementById("gameOverScreen").style.display = "none";
+            score = 0;
+            gameOver = false;
+            speed = 2;
+            targets.length = 0;
+            gameLoop();
+        });
+
+        gameLoop();
+    </script>
 </body>
 </html>
+
 
