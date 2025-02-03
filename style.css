@@ -2,17 +2,37 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-family: Arial, sans-serif;
 }
-
 body {
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
-    background-color: #87CEEB; /* Sky Blue */
+    background: linear-gradient(to bottom, #a8e6cf, #dcedc1);
+}
+canvas {
+    background-color: white;
+    border: 3px solid black;
+}
+#gameOverScreen {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+}
+#restartButton {
+    margin-top: 10px;
+    padding: 10px;
+    background: #ff8b94;
+    color: white;
+    border: none;
+    cursor: pointer;
 }
 
-canvas {
-    background-color: #f5f5dc; /* Light Brown Background */
-    border: 2px solid black;
-}
