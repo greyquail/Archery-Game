@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced Arrow Physics Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #333; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Game variables
+        let bow = { x: 50, y: canvas.height / 2, angle: 0 };
+        let arrow = null;
+        let targets = [];
+        let gravity = 0.5;
+        let score = 0;
+        let timer = 30; // Seconds
+        let gameMode = "normal"; // normal, wind, powerup
+
+        // Input handling (mouse/touch)
+        let isAiming = false;
+        let aimStart = { x: 0, y: 0 };
+
+        // Functions for drawing and updating game elements
+        function drawBackground() {
+            ctx.fillStyle = "#222";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "darkgreen";
+            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+        }
+
+        function drawBow() {
+            ctx.save();
+            ctx.translate(bow.x, bow.y);
+            ctx.rotate(bow.angle);
+            ctx.font = "30px serif";
+            ctx.fillText("🏹", -15, 10);
+            ctx.restore();
+        }
+
+        function drawArrow() {
+            ctx.save();
+            ctx.translate(arrow.x, arrow.y);
+            ctx.rotate(arrow.angle);
+            ctx.font = "20px serif";
+            ctx.fillText("→", -10, 5);
+            ctx.restore();
+        }
+
+        function drawTarget(target) {
+            ctx.fillStyle = target.color;
+            ctx.beginPath();
+            ctx.arc(target.x, target.y, 25, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function updateArrow() {
+            arrow.x += arrow.velocity.x;
+            arrow.y += arrow.velocity.y;
+            arrow.velocity.y += gravity;
+            arrow.angle = Math.atan2(arrow.velocity.y, arrow.velocity.x);
+
+            if (gameMode === "wind") {
+                arrow.velocity.x += Math.random() * 0.2 - 0.1;
+            }
+        }
+
+        function createTarget() {
+            let color = "red";
+            if (Math.random() < 0.2) color = "yellow";
+            targets.push({
+                x: canvas.width - 50 - Math.random() * 200,
+                y: Math.random() * (canvas.height - 200) + 100,
+                speed: (Math.random() - 0.5) * 2,
+                color: color,
+            });
+        }
+
+        function checkCollisions() {
+            if (arrow) {
+                targets.forEach((target, index) => {
+                    const dx = arrow.x - target.x;
+                    const dy = arrow.y - target.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 25) {
+                        targets.splice(index, 1);
+                        arrow = null;
+                        if (target.color === "yellow") {
+                            timer += 5;
+                        }
+                        score++;
+                        createTarget();
+                    }
+                });
+
+                if (arrow.x < 0 || arrow.x > canvas.width || arrow.y < 0 || arrow.y > canvas.height) {
+                    arrow = null;
+                }
+            }
+        }
+
+        function drawScore() {
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText("Score: " + score, 10, 30);
+            ctx.fillText("Time: " + Math.round(timer), 10, 60);
+            ctx.fillText("Mode: " + gameMode, 10, 90);
+        }
+
+        function drawAimLine() {
+            if (isAiming) {
+                ctx.strokeStyle = "gray";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(bow.x + 30 * Math.cos(bow.angle), bow.y + 30 * Math.sin(bow.angle));
+                ctx.lineTo(aimStart.x, aimStart.y);
+                ctx.stroke();
+            }
+        }
+
+        // Event listeners
+        canvas.addEventListener("mousedown", (e) => {
+            isAiming = true;
+            aimStart = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+            if (isAiming) {
+                bow.angle = Math.atan2(e.clientY - bow.y, e.clientX - bow.x);
+            }
+        });
+
+        canvas.addEventListener("mouseup", (e) => {
+            if (isAiming) {
+                isAiming = false;
+                let velocityX = (aimStart.x - e.clientX) / 10;
+                let velocityY = (aimStart.y - e.clientY) / 10;
+                arrow = { x: bow.x + 30 * Math.cos(bow.angle), y: bow.y + 30 * Math.sin(bow.angle), velocity: { x: velocityX, y: velocityY }, angle: bow.angle };
+            }
+        });
+
+        canvas.addEventListener("touchstart", (e) => {
+            isAiming = true;
+            aimStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        });
+
+        canvas.addEventListener("touchmove", (e) => {
+            if (isAiming) {
+                bow.angle = Math.atan2(e.touches[0].clientY - bow.y, e.touches[0].clientX - bow.x);
+            }
+        });
+
+        canvas.addEventListener("touchend", (e) => {
+            if (isAiming) {
+                isAiming = false;
+                let velocityX = (aimStart.x - e.changedTouches[0].clientX) / 10;
+                let velocityY = (aimStart.y - e.changedTouches[0].clientY) / 10;
+                arrow = { x: bow.x + 30 * Math.cos(bow.angle), y: bow.y + 30 * Math.sin(bow.angle), velocity: { x: velocityX, y: velocityY }, angle: bow.angle };
+            }
+        });
+
+        // Game loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            if (arrow) updateArrow();
+            drawBow();
+            targets.forEach((target) => {
+                target.x += target.speed;
+                drawTarget(target);
+            });
+            if (arrow) drawArrow();
+            checkCollisions();
+            drawScore();
+            drawAimLine();
+
+            timer -= 1 / 60;
+            if (timer <= 0) {
+                alert("Game Over! Score: " + score);
+                timer = 30;
+                score = 0;
+                targets = [];
+                createTarget();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize game
+        createTarget();
+        gameLoop(); // Crucial line to start the game loop
+    </script>
+</body>
+</html>
