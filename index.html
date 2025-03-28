@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arrow Physics Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: lightblue; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Game variables
+        let bow = { x: 50, y: canvas.height / 2, angle: 0 };
+        let arrow = null;
+        let targets = [];
+        let gravity = 0.5;
+        let score = 0;
+
+        // Input handling (mouse/touch)
+        let isAiming = false;
+        let aimStart = { x: 0, y: 0 };
+
+        // Functions for drawing and updating game elements
+        function drawBow() {
+            ctx.save();
+            ctx.translate(bow.x, bow.y);
+            ctx.rotate(bow.angle);
+            ctx.beginPath();
+            ctx.moveTo(0, -20);
+            ctx.lineTo(30, 0);
+            ctx.lineTo(0, 20);
+            ctx.strokeStyle = "brown";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawArrow() {
+            ctx.save();
+            ctx.translate(arrow.x, arrow.y);
+            ctx.rotate(arrow.angle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(20, 0);
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(20, 0);
+            ctx.lineTo(25, -5);
+            ctx.lineTo(25, 5);
+            ctx.closePath();
+            ctx.fillStyle = "black";
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawTarget(target) {
+            ctx.fillStyle = "red";
+            ctx.fillRect(target.x - 15, target.y - 30, 30, 60);
+        }
+
+        function updateArrow() {
+            arrow.x += arrow.velocity.x;
+            arrow.y += arrow.velocity.y;
+            arrow.velocity.y += gravity;
+            arrow.angle = Math.atan2(arrow.velocity.y, arrow.velocity.x);
+        }
+
+        function createTarget() {
+            targets.push({
+                x: canvas.width - 50 - Math.random() * 100,
+                y: Math.random() * (canvas.height - 100) + 50,
+            });
+        }
+
+        function checkCollisions() {
+            if (arrow) {
+                targets.forEach((target, index) => {
+                    if (
+                        arrow.x > target.x - 15 &&
+                        arrow.x < target.x + 15 &&
+                        arrow.y > target.y - 30 &&
+                        arrow.y < target.y + 30
+                    ) {
+                        targets.splice(index, 1);
+                        arrow = null;
+                        score++;
+                        createTarget();
+                    }
+                });
+
+                if (arrow.x < 0 || arrow.x > canvas.width || arrow.y < 0 || arrow.y > canvas.height) {
+                    arrow = null;
+                }
+            }
+        }
+
+        function drawScore() {
+            ctx.fillStyle = "black";
+            ctx.font = "20px Arial";
+            ctx.fillText("Score: " + score, 10, 30);
+        }
+
+        // Event listeners
+        canvas.addEventListener("mousedown", (e) => {
+            isAiming = true;
+            aimStart = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+            if (isAiming) {
+                bow.angle = Math.atan2(e.clientY - bow.y, e.clientX - bow.x);
+            }
+        });
+
+        canvas.addEventListener("mouseup", (e) => {
+            if (isAiming) {
+                isAiming = false;
+                let velocityX = (aimStart.x - e.clientX) / 10;
+                let velocityY = (aimStart.y - e.clientY) / 10;
+                arrow = { x: bow.x + 30 * Math.cos(bow.angle), y: bow.y + 30 * Math.sin(bow.angle), velocity: { x: velocityX, y: velocityY }, angle: bow.angle };
+            }
+        });
+
+        canvas.addEventListener("touchstart", (e) => {
+            isAiming = true;
+            aimStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        });
+
+        canvas.addEventListener("touchmove", (e) => {
+            if (isAiming) {
+                bow.angle = Math.atan2(e.touches[0].clientY - bow.y, e.touches[0].clientX - bow.x);
+            }
+        });
+
+        canvas.addEventListener("touchend", (e) => {
+            if (isAiming) {
+                isAiming = false;
+                let velocityX = (aimStart.x - e.changedTouches[0].clientX) / 10;
+                let velocityY = (aimStart.y - e.changedTouches[0].clientY) / 10;
+                arrow = { x: bow.x + 30 * Math.cos(bow.angle), y: bow.y + 30 * Math.sin(bow.angle), velocity: { x: velocityX, y: velocityY }, angle: bow.angle };
+            }
+        });
+
+        // Game loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (arrow) updateArrow();
+            drawBow();
+            targets.forEach(drawTarget);
+            if (arrow) drawArrow();
+            checkCollisions();
+            drawScore();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize game
+        createTarget();
+        gameLoop();
+    </script>
+</body>
+</html>
