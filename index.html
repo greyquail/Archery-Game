@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arcane Archer: Enhanced</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; }
+        canvas { display: block; }
+        #hud { position: fixed; top: 10px; left: 10px; color: white; font-family: Arial; }
+        #elementUI { position: fixed; bottom: 20px; left: 20px; color: white; }
+        #combos { position: fixed; top: 10px; right: 10px; color: white; }
+    </style>
+</head>
+<body>
+    <div id="hud"></div>
+    <div id="elementUI"></div>
+    <div id="combos"></div>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Core Game Systems
+        const Game = {
+            state: 'menu',
+            score: 0,
+            health: 100,
+            level: 1,
+            combos: 0,
+            lastHit: 0,
+            elements: { current: 'normal', charge: 0 },
+            weather: { type: 'clear', timer: 0 }
+        };
+
+        // Player Components
+        const Player = {
+            x: 100,
+            y: canvas.height/2,
+            angle: 0,
+            power: 1,
+            attacks: []
+        };
+
+        // Game Entities
+        let entities = {
+            arrows: [],
+            targets: [],
+            enemies: [],
+            particles: [],
+            powerups: []
+        };
+
+        // Elemental Effects
+        const Elements = {
+            normal: { color: '#fff', effect: null },
+            fire: { color: '#ff3300', effect: 'burn' },
+            ice: { color: '#00ffff', effect: 'freeze' },
+            storm: { color: '#ffeb3b', effect: 'chain' }
+        };
+
+        // Weather System
+        const Weather = {
+            effects: {
+                clear: { wind: 0, fog: 1 },
+                windy: { wind: 0.5, fog: 0.9 },
+                storm: { wind: 1, fog: 0.7 }
+            },
+            update() {
+                if(Math.random() < 0.001) this.change();
+                ctx.globalAlpha = this.effects[Game.weather.type].fog;
+            },
+            change() {
+                const types = Object.keys(this.effects);
+                Game.weather.type = types[Math.floor(Math.random() * types.length)];
+                Game.weather.timer = 5000;
+            }
+        };
+
+        // Core Game Loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if(Game.state === 'playing') {
+                updateGame();
+                drawGame();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateGame() {
+            // Update systems
+            Weather.update();
+            updateEntities();
+            updateCombat();
+            updateElements();
+            checkCollisions();
+            spawnEnemies();
+        }
+
+        function drawGame() {
+            // Draw environment
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw weather
+            ctx.fillStyle = this.getWeatherColor();
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw entities
+            drawEntities();
+            
+            // Draw HUD
+            document.getElementById('hud').innerHTML = `
+                Health: ${Game.health}<br>
+                Score: ${Game.score}<br>
+                Level: ${Game.level}
+            `;
+            
+            document.getElementById('elementUI').innerHTML = `
+                Element: ${Game.elements.current}<br>
+                Charge: ${Math.round(Game.elements.charge)}%
+            `;
+            
+            document.getElementById('combos').innerHTML = `
+                Combo: x${Game.combos}
+            `;
+        }
+
+        // Advanced Combat System
+        function updateCombat() {
+            // Combo system
+            if(Date.now() - Game.lastHit > 2000) Game.combos = 0;
+            
+            // Element charging
+            if(Game.elements.current !== 'normal') {
+                Game.elements.charge = Math.min(100, Game.elements.charge + 0.1);
+            }
+        }
+
+        // Elemental Interaction System
+        function updateElements() {
+            entities.arrows.forEach(arrow => {
+                switch(arrow.element) {
+                    case 'fire':
+                        entities.targets.forEach(t => {
+                            if(distance(arrow, t) < 50) t.health -= 0.2;
+                        });
+                        break;
+                    case 'ice':
+                        arrow.velocity.y *= 0.98;
+                        break;
+                    case 'storm':
+                        if(Math.random() < 0.1) {
+                            entities.arrows.push(cloneArrow(arrow));
+                        }
+                        break;
+                }
+            });
+        }
+
+        // Entity Management
+        function updateEntities() {
+            entities.arrows = entities.arrows.filter(a => 
+                a.x > -50 && a.x < canvas.width + 50 && 
+                a.y > -50 && a.y < canvas.height + 50
+            );
+            
+            entities.arrows.forEach(a => {
+                a.x += a.velocity.x;
+                a.y += a.velocity.y;
+                a.velocity.y += 0.3;
+                a.angle = Math.atan2(a.velocity.y, a.velocity.x);
+                a.velocity.x += Weather.effects[Game.weather.type].wind * (Math.random() - 0.5);
+            });
+        }
+
+        // Collision System
+        function checkCollisions() {
+            entities.arrows.forEach((arrow, ai) => {
+                entities.targets.forEach((target, ti) => {
+                    if(distance(arrow, target) < target.size) {
+                        handleHit(arrow, target, ai, ti);
+                    }
+                });
+            });
+        }
+
+        function handleHit(arrow, target, ai, ti) {
+            Game.score += target.value;
+            Game.combos++;
+            Game.lastHit = Date.now();
+            
+            // Elemental effects
+            if(arrow.element === 'fire') {
+                createExplosion(target.x, target.y);
+            }
+            
+            entities.targets.splice(ti, 1);
+            entities.arrows.splice(ai, 1);
+            spawnTargets();
+        }
+
+        // Helper Functions
+        function distance(a, b) {
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        }
+
+        function createArrow(x, y, power, element) {
+            return {
+                x, y,
+                velocity: { x: Math.cos(Player.angle) * power, 
+                          y: Math.sin(Player.angle) * power },
+                angle: Player.angle,
+                element,
+                power
+            };
+        }
+
+        // Input System
+        let aiming = false;
+        let aimStart = { x: 0, y: 0 };
+
+        canvas.addEventListener('mousedown', e => {
+            if(Game.state === 'playing') {
+                aiming = true;
+                aimStart = { x: e.clientX, y: e.clientY };
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if(aiming) {
+                Player.angle = Math.atan2(e.clientY - Player.y, e.clientX - Player.x);
+            }
+        });
+
+        canvas.addEventListener('mouseup', e => {
+            if(aiming) {
+                const power = Math.hypot(aimStart.x - e.clientX, aimStart.y - e.clientY) / 10;
+                entities.arrows.push(createArrow(
+                    Player.x + 30 * Math.cos(Player.angle),
+                    Player.y + 30 * Math.sin(Player.angle),
+                    power,
+                    Game.elements.current
+                ));
+                aiming = false;
+            }
+        });
+
+        // Initialize Game
+        function startGame() {
+            Game.state = 'playing';
+            Game.score = 0;
+            Game.health = 100;
+            Game.level = 1;
+            entities = { arrows: [], targets: [], enemies: [], particles: [], powerups: [] };
+            spawnTargets();
+            gameLoop();
+        }
+
+        // Start the game
+        startGame();
+    </script>
+</body>
+</html>
