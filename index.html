@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arcane Archer 2.1</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; }
+        canvas { display: block; }
+        #menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: white; }
+        button { padding: 15px 30px; font-size: 20px; background: #4CAF50; border: none; color: white; cursor: pointer; border-radius: 5px; }
+        #hud { position: fixed; top: 10px; left: 10px; color: white; font-family: Arial; }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1>Arcane Archer</h1>
+        <button onclick="startGame()">Start Game</button>
+        <p>Drag back to aim, release to shoot<br>Hit special targets for power-ups!</p>
+    </div>
+    <div id="hud"></div>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // ========== ENHANCEMENT 1: NEW GAME STATE PROPERTIES ==========
+        const ENHANCED_STATE = {
+            screenShake: 0,
+            enemies: [],
+            boss: null,
+            combos: 0,
+            lastHitTime: 0
+        };
+
+        // ========== ORIGINAL GAME STATE ==========
+        let gameState = 'menu';
+        let bow = { x: 100, y: canvas.height/2, angle: 0 };
+        let arrows = [];
+        let targets = [];
+        let particles = [];
+        let powerUps = [];
+        let score = 0;
+        let health = 100;
+        let level = 1;
+        let powerUpActive = null;
+        let powerUpEndTime = 0;
+
+        // ========== ENHANCEMENT 2: ENEMY ARCHER CLASS ==========
+        class EnemyArcher {
+            constructor() {
+                this.x = canvas.width - 150;
+                this.y = canvas.height/2;
+                this.cooldown = 2000;
+                this.lastShot = Date.now();
+                this.health = 100;
+            }
+
+            update() {
+                if(Date.now() - this.lastShot > this.cooldown) {
+                    const angle = Math.atan2(bow.y - this.y, bow.x - this.x);
+                    arrows.push(new Arrow(
+                        this.x,
+                        this.y,
+                        { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 },
+                        angle,
+                        true // isEnemyArrow
+                    ));
+                    this.lastShot = Date.now();
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = '#795548';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 25, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
+        // ========== ORIGINAL CLASSES (MODIFIED FOR ENHANCEMENTS) ==========
+        class Arrow {
+            constructor(x, y, velocity, angle, isEnemyArrow = false) {
+                this.x = x;
+                this.y = y;
+                this.velocity = velocity;
+                this.angle = angle;
+                this.trail = [];
+                this.isEnemyArrow = isEnemyArrow;
+            }
+
+            update() {
+                this.trail.push({x: this.x, y: this.y});
+                if(this.trail.length > 5) this.trail.shift();
+                
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.velocity.y += 0.3;
+                this.angle = Math.atan2(this.velocity.y, this.velocity.x);
+                
+                if(powerUpActive === 'wind') {
+                    this.velocity.x += Math.random() * 0.2 - 0.1;
+                }
+            }
+
+            draw() {
+                // ... keep original draw code ...
+            }
+        }
+
+        // ========== ENHANCEMENT 3: UPDATED UPDATEGAME() ==========
+        function updateGame() {
+            // Original collision detection
+            arrows.forEach((arrow, arrowIndex) => {
+                targets.forEach((target, targetIndex) => {
+                    const dx = arrow.x - target.x;
+                    const dy = arrow.y - target.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if(distance < target.size) {
+                        // Enhanced combo system
+                        if(Date.now() - ENHANCED_STATE.lastHitTime < 2000) ENHANCED_STATE.combos++;
+                        else ENHANCED_STATE.combos = 1;
+                        ENHANCED_STATE.lastHitTime = Date.now();
+                        
+                        // Original hit handling
+                        score += TARGET_TYPES[target.type].score * ENHANCED_STATE.combos;
+                    }
+                });
+            });
+
+            // New: Enemy logic
+            ENHANCED_STATE.enemies.forEach(enemy => enemy.update());
+
+            // New: Screen shake decay
+            ENHANCED_STATE.screenShake *= 0.9;
+        }
+
+        // ========== ENHANCEMENT 4: UPDATED DRAWGAME() ==========
+        function drawGame() {
+            // Apply screen shake
+            ctx.save();
+            ctx.translate(
+                Math.random() * ENHANCED_STATE.screenShake * 2 - ENHANCED_STATE.screenShake,
+                Math.random() * ENHANCED_STATE.screenShake * 2 - ENHANCED_STATE.screenShake
+            );
+
+            // Original drawing code
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // New: Draw enemies
+            ENHANCED_STATE.enemies.forEach(enemy => enemy.draw());
+
+            ctx.restore();
+            
+            // Enhanced HUD
+            document.getElementById('hud').innerHTML = `
+                Score: ${score}<br>
+                Health: ${health}<br>
+                Level: ${level}<br>
+                Combo: x${ENHANCED_STATE.combos}<br>
+                ${powerUpActive ? `Powerup: ${powerUpActive} (${Math.ceil((powerUpEndTime - Date.now())/1000)}s)` : ''}
+            `;
+        }
+
+        // ========== ORIGINAL CODE BELOW (UNCHANGED) ==========
+        // [Keep all your original code here including:
+        // - Target class
+        // - Particle class
+        // - createParticles()
+        // - createPowerUp()
+        // - spawnTargets()
+        // - input handling
+        // - game loop]
+
+        // ========== ENHANCEMENT 5: MODIFIED STARTGAME() ==========
+        function startGame() {
+            gameState = 'playing';
+            document.getElementById('menu').style.display = 'none';
+            score = 0;
+            health = 100;
+            level = 1;
+            arrows = [];
+            targets = [];
+            particles = [];
+            powerUps = [];
+            ENHANCED_STATE.enemies = [new EnemyArcher()]; // New enemy
+            spawnTargets();
+        }
+
+        // Initialize game loop
+        gameLoop();
+    </script>
+</body>
+</html>
