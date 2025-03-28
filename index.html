@@ -1,0 +1,197 @@
+<script>
+// Add these new features to the existing code
+
+// 1. Enemy Archers System
+class EnemyArcher {
+    constructor() {
+        this.x = canvas.width - 150;
+        this.y = canvas.height/2;
+        this.cooldown = 2000;
+        this.lastShot = Date.now();
+        this.health = 100;
+    }
+
+    update() {
+        // Shoot at player position
+        if(Date.now() - this.lastShot > this.cooldown) {
+            const angle = Math.atan2(bow.y - this.y, bow.x - this.x);
+            arrows.push(new Arrow(
+                this.x,
+                this.y,
+                { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 },
+                angle,
+                true // isEnemyArrow
+            ));
+            this.lastShot = Date.now();
+        }
+    }
+
+    draw() {
+        ctx.fillStyle = '#795548';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 25, 0, Math.PI*2);
+        ctx.fill();
+    }
+}
+
+// 2. Boss Battle System
+class Boss {
+    constructor() {
+        this.health = 500;
+        this.x = canvas.width + 200;
+        this.y = canvas.height/2;
+        this.size = 80;
+        this.speed = -2;
+        this.attackCooldown = 3000;
+        this.lastAttack = Date.now();
+    }
+
+    update() {
+        this.x += this.speed;
+        if(this.x < canvas.width - 400) this.speed = 0;
+        
+        if(Date.now() - this.lastAttack > this.attackCooldown) {
+            this.shootFireball();
+            this.lastAttack = Date.now();
+        }
+    }
+
+    shootFireball() {
+        const angle = Math.atan2(bow.y - this.y, bow.x - this.x);
+        arrows.push(new Arrow(
+            this.x,
+            this.y,
+            { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 },
+            angle,
+            true // isEnemyArrow
+        ));
+    }
+
+    draw() {
+        ctx.fillStyle = '#D32F2F';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+        
+        // Health bar
+        ctx.fillStyle = '#4CAF50';
+        ctx.fillRect(this.x - 50, this.y - this.size - 20, 100 * (this.health/500), 10);
+    }
+}
+
+// 3. Enhanced Power-Up Effects
+const POWERUP_EFFECTS = {
+    fire: {
+        activate: () => {
+            // Arrows set targets on fire
+            Arrow.prototype.onHit = function(target) {
+                target.onFire = true;
+                target.fireDuration = 2000;
+            };
+        }
+    },
+    multishot: {
+        activate: () => {
+            // Shoot 3 arrows at once
+            const baseAngle = bow.angle;
+            [-0.2, 0, 0.2].forEach(offset => {
+                arrows.push(new Arrow(
+                    bow.x + 30 * Math.cos(baseAngle + offset),
+                    bow.y + 30 * Math.sin(baseAngle + offset),
+                    { x: velocityX, y: velocityY },
+                    baseAngle + offset
+                ));
+            });
+        }
+    }
+};
+
+// 4. Health System
+function checkPlayerHit() {
+    arrows.forEach((arrow, index) => {
+        if(arrow.isEnemyArrow) {
+            const dx = arrow.x - bow.x;
+            const dy = arrow.y - bow.y;
+            if(Math.hypot(dx, dy) < 30) {
+                health -= 20;
+                createParticles(bow.x, bow.y, '#FF0000', 20);
+                arrows.splice(index, 1);
+                
+                // Screen shake effect
+                canvas.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
+                setTimeout(() => canvas.style.transform = '', 100);
+            }
+        }
+    });
+}
+
+// 5. Screen Shake Effect
+let shakeIntensity = 0;
+function applyScreenShake() {
+    if(shakeIntensity > 0) {
+        ctx.translate(Math.random()*shakeIntensity*2-shakeIntensity, 
+                     Math.random()*shakeIntensity*2-shakeIntensity);
+        shakeIntensity *= 0.9;
+    }
+}
+
+// Modified updateGame function
+function updateGame() {
+    // Add to existing updateGame:
+    checkPlayerHit();
+    
+    // Update enemies
+    enemies.forEach(enemy => enemy.update());
+    
+    // Update boss
+    if(boss) boss.update();
+    
+    // Update burning targets
+    targets.forEach(target => {
+        if(target.onFire) {
+            target.health -= 0.1;
+            createParticles(target.x, target.y, '#FF5722', 1);
+            if(Date.now() - target.fireStart > target.fireDuration) {
+                target.onFire = false;
+            }
+        }
+    });
+}
+
+// Modified drawGame function
+function drawGame() {
+    ctx.save();
+    applyScreenShake();
+    
+    // Existing draw code...
+    
+    // Draw enemies
+    enemies.forEach(enemy => enemy.draw());
+    
+    // Draw boss
+    if(boss) boss.draw();
+    
+    ctx.restore();
+}
+
+// Add these variables to game state
+let enemies = [];
+let boss = null;
+let shakeIntensity = 0;
+
+// Modified startGame function
+function startGame() {
+    // Existing code...
+    enemies = [new EnemyArcher()];
+    boss = null;
+}
+
+// Add boss spawning logic in spawnTargets
+function spawnTargets() {
+    // Existing code...
+    if(level % 3 === 0 && !boss) {
+        boss = new Boss();
+        shakeIntensity = 10;
+    }
+}
+</script>
